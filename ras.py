@@ -1,61 +1,75 @@
 import os
 import shutil
+import hashlib
+import tarfile
 
-# Создание директории для результатов
+# init: папка вывода
 os.makedirs("ras", exist_ok=True)
 
-# Определение игнорируемых директорий и файлов
-ignore_dirs = {"__pycache__", "ras", "GameAssets", "Assets"}
-ignore_files = {"script.py"}
+# ign: игнор-списки
+igd = {"__pycache__", "ras", "GameAssets", "Assets"}
+igf = {"script.py"}
+igx = {".log", ".tmp"}  # new: игнор по расширению
 
-# --- Удаление всех папок с названиями 'obj' и 'bin' ---
-def remove_dirs_by_name(root_dir, dir_names_to_remove):
-    for dirpath, dirnames, filenames in os.walk(root_dir, topdown=False):
-        for dirname in dirnames:
-            if dirname in dir_names_to_remove:
-                full_path = os.path.join(dirpath, dirname)
-                print(f"Удаление папки: {full_path}")
-                shutil.rmtree(full_path)
+# rmj: чистка мусора
+def rmj(r, n):
+    for a, b, _ in os.walk(r, topdown=False):
+        for d in b:
+            if d in n:
+                p = os.path.join(a, d)
+                print(f"del: {p}")
+                shutil.rmtree(p)
 
-# Выполняем удаление
-remove_dirs_by_name(".", {"obj", "bin"})
+rmj(".", {"obj", "bin"})
 
-# --- Обработка корневых файлов ---
-with open("ras/Корневая.txt", "w", encoding="utf-8") as root_out:
-    for item in os.listdir("."):
-        if os.path.isfile(item) and item not in ignore_files:
-            root_out.write(f"ПАПКА: .\n")  # Корень — это "."
-            root_out.write(f"--------Файл: {item}\n")
+# hx: короткий хеш
+def hx(f):
+    h = hashlib.sha256()
+    try:
+        with open(f, "rb") as ff:
+            h.update(ff.read())
+        return h.hexdigest()[:8]
+    except:
+        return "FAIL"
+
+# root: обработка корня
+with open("ras/Корневая.txt", "w", encoding="utf-8") as k:
+    for i in os.listdir("."):
+        if os.path.isfile(i) and i not in igf and not i.endswith(tuple(igx)):
+            k.write(f"ПАПКА: .\n")
+            k.write(f"--------Файл: {i}\n")
+            k.write(f"ХЭШ: {hx(os.path.join('.', i))}\n")  # fix: полный путь
             try:
-                with open(item, "r", encoding="utf-8") as f:
-                    root_out.write(f.read())
-            except Exception:
-                root_out.write("[BINARY or ERROR]")
-            root_out.write("\n\n")
+                with open(i, "r", encoding="utf-8") as f:
+                    k.write(f.read())
+            except:
+                k.write("[BIN]")
+            k.write("\n\n")
 
-# --- Обработка папок первого уровня ---
-for item in os.listdir("."):
-    if os.path.isdir(item) and item not in ignore_dirs:
-        output_file = f"ras/{item}.txt"
-        with open(output_file, "w", encoding="utf-8") as out:
-            # Записываем заголовок папки
-            out.write(f"ПАПКА: {item}\n")
-            
-            # Проходим по всем поддиректориям и файлам внутри
-            for dirpath, dirnames, files in os.walk(item):
-                # Фильтруем игнорируемые директории на лету
-                dirnames[:] = [d for d in dirnames if d not in ignore_dirs]
-                
-                # Для каждого файла в текущей директории
-                for f in files:
-                    fp = os.path.join(dirpath, f)
-                    # Относительный путь от корня папки (для читаемости)
-                    rel_path = os.path.relpath(fp, item)
-                    
-                    out.write(f"--------Файл: {rel_path}\n")
+# scan: обработка подпапок
+for i in os.listdir("."):
+    if os.path.isdir(i) and i not in igd:
+        o = f"ras/{i}.txt"
+        with open(o, "w", encoding="utf-8") as f:
+            f.write(f"ПАПКА: {i}\n")
+            for dp, dn, fl in os.walk(i):
+                dn[:] = [d for d in dn if d not in igd]
+                for fi in fl:
+                    if fi.endswith(tuple(igx)):
+                        continue
+                    p = os.path.join(dp, fi)
+                    rp = os.path.relpath(p, i)
+                    f.write(f"--------Файл: {rp}\n")
+                    f.write(f"ХЭШ: {hx(p)}\n")
                     try:
-                        with open(fp, "r", encoding="utf-8") as infile:
-                            out.write(infile.read())
-                    except Exception:
-                        out.write("[BINARY or ERROR]")
-                    out.write("\n\n")
+                        with open(p, "r", encoding="utf-8") as inf:
+                            f.write(inf.read())
+                    except:
+                        f.write("[BIN]")
+                    f.write("\n\n")
+
+# arch: архивация результата
+shutil.make_archive("ras_archive", "tar", "ras")
+print("Архив ras_archive.tar готов")
+
+# github: KilixKilik
